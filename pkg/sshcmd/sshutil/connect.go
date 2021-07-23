@@ -14,6 +14,15 @@ import (
 这里主要是做连接ssh操作的
 */
 func (ss *SSH) connect(host string) (*ssh.Client, error) {
+	if ss.OriginalPass == "" {
+		ss.OriginalPass = ss.Password
+	}
+	if ss.UserPass[host] != "" {
+		ss.Password = ss.UserPass[host]
+	} else if ss.OriginalPass != "" {
+		ss.Password = ss.OriginalPass
+	}
+	//
 	auth := ss.sshAuthMethod(ss.Password, ss.PkFile, ss.PkPassword)
 	config := ssh.Config{
 		Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr", "aes128-gcm@openssh.com", "arcfour256", "arcfour128", "aes128-cbc", "3des-cbc", "aes192-cbc", "aes256-cbc"},

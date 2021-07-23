@@ -38,6 +38,9 @@ var (
 	PodCIDR string
 	SvcCIDR string
 
+	SdwanUrl     string
+	AssignMaster string
+
 	Envs          []string // read env from -e
 	PackageConfig string   // install/delete package config
 	Values        string   // values for  install package values.yaml

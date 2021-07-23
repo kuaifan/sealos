@@ -44,6 +44,14 @@ type SealConfig struct {
 	AliOss
 }
 
+func GetConfigPath(path string) string {
+	if path == "" {
+		home, _ := os.UserHomeDir()
+		path = home + defaultConfigPath + defaultConfigFile
+	}
+	return path
+}
+
 //Dump is
 func (c *SealConfig) Dump(path string) {
 	home, _ := os.UserHomeDir()
@@ -55,7 +63,11 @@ func (c *SealConfig) Dump(path string) {
 	NodeIPs = ParseIPs(NodeIPs)
 	c.Nodes = ParseIPs(NodeIPs)
 	c.User = SSHConfig.User
-	c.Passwd = SSHConfig.Password
+	if SSHConfig.OriginalPass != "" {
+		c.Passwd = SSHConfig.OriginalPass
+	} else {
+		c.Passwd = SSHConfig.Password
+	}
 	c.PrivateKey = SSHConfig.PkFile
 	c.PkPassword = SSHConfig.PkPassword
 	c.ApiServerDomain = ApiServer
@@ -138,7 +150,9 @@ func (c *SealConfig) Load(path string) (err error) {
 	ApiServer = c.ApiServerDomain
 	Network = c.Network
 	VIP = c.VIP
-	PkgUrl = c.PkgURL
+	if PkgUrl == "" {
+		PkgUrl = c.PkgURL
+	}
 	Version = c.Version
 	Repo = c.Repo
 	PodCIDR = c.PodCIDR
@@ -150,6 +164,10 @@ func (c *SealConfig) Load(path string) (err error) {
 	//lvscare
 	LvscareImage.Image = c.LvscareName
 	LvscareImage.Tag = c.LvscareTag
+
+	if AssignMaster != "" {
+		MasterIPs[0] = AssignMaster
+	}
 
 	// 优先使用使用命令行， 再使用配置文件
 	if AccessKeyId == "" || AccessKeySecrets == "" ||

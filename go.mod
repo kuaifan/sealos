@@ -10,6 +10,7 @@ require (
 	github.com/fanux/sealgate v0.0.5
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/linuxsuren/cobra-extension v0.0.8
+	github.com/nahid/gohttp v0.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp v1.11.0
 	github.com/prometheus/common v0.13.0 // indirect

@@ -15,7 +15,10 @@
 package cmd
 
 import (
+	"github.com/fanux/sealos/pkg/sshcmd/sshutil"
+	"net"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -39,6 +42,29 @@ var joinCmd = &cobra.Command{
 		beforeNodes := install.ParseIPs(install.NodeIPs)
 		beforeMasters := install.ParseIPs(install.MasterIPs)
 
+		if install.AssignMaster != "" {
+			var array []string
+			array = append(array, install.AssignMaster)
+			install.AssignMaster = install.ParseIPs(install.ParsePasss(array))[0]
+
+			extranetIp, _, _ := install.RunShellInSystem("curl ip.sb")
+			extranetIp = strings.TrimSpace(extranetIp)
+			if net.ParseIP(extranetIp).To4() == nil {
+				logger.Error("failed to get external IP")
+				os.Exit(1)
+			}
+			if extranetIp == install.RemoveIpPort(install.AssignMaster) {
+				logger.Info("[%s] extranet ip %s is same, sikp copy remote file to local", install.AssignMaster, extranetIp)
+			} else {
+				logger.Info("[%s] copy remote file to local...", install.AssignMaster)
+				config := sshutil.SSH{
+					User:     "root",
+					Password: install.SSHConfig.UserPass[install.AssignMaster],
+				}
+				config.CopyRemoteFileToLocal(install.AssignMaster, install.GetConfigPath(cfgFile), install.GetConfigPath(cfgFile))
+			}
+		}
+
 		c := &install.SealConfig{}
 		err := c.Load(cfgFile)
 		if err != nil {
@@ -56,4 +82,8 @@ func init() {
 	joinCmd.Flags().StringSliceVar(&install.MasterIPs, "master", []string{}, "kubernetes multi-master ex. 192.168.0.5-192.168.0.5")
 	joinCmd.Flags().StringSliceVar(&install.NodeIPs, "node", []string{}, "kubernetes multi-nodes ex. 192.168.0.5-192.168.0.5")
 	joinCmd.Flags().IntVar(&install.Vlog, "vlog", 0, "kubeadm log level")
+
+	joinCmd.Flags().StringVar(&install.AssignMaster, "assign-master", "", "appoint master")
+	joinCmd.Flags().StringVar(&install.SdwanUrl, "sdwan-url", "", "node publishes to this URL after deployment is complete")
+	joinCmd.Flags().StringVar(&install.PkgUrl, "pkg-url", "", "http://store.lameleg.com/kube1.14.1.tar.gz download offline package url, or file location ex. /root/kube1.14.1.tar.gz")
 }

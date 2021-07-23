@@ -15,7 +15,10 @@
 package cmd
 
 import (
+	"github.com/fanux/sealos/pkg/sshcmd/sshutil"
+	"net"
 	"os"
+	"strings"
 
 	"github.com/fanux/sealos/install"
 	"github.com/spf13/cobra"
@@ -65,11 +68,38 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// cleanCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	cleanCmd.Flags().StringVar(&install.AssignMaster, "assign-master", "", "appoint master")
+	cleanCmd.Flags().StringVar(&install.SdwanUrl, "sdwan-url", "", "node publishes to this URL after clean is complete")
 }
 
 func CleanCmdFunc(cmd *cobra.Command, args []string) {
 	deleteNodes := install.ParseIPs(install.NodeIPs)
 	deleteMasters := install.ParseIPs(install.MasterIPs)
+
+	if install.AssignMaster != "" {
+		var array []string
+		array = append(array, install.AssignMaster)
+		install.AssignMaster = install.ParseIPs(install.ParsePasss(array))[0]
+
+		extranetIp, _, _ := install.RunShellInSystem("curl ip.sb")
+		extranetIp = strings.TrimSpace(extranetIp)
+		if net.ParseIP(extranetIp).To4() == nil {
+			logger.Error("failed to get external IP")
+			os.Exit(1)
+		}
+		if extranetIp == install.RemoveIpPort(install.AssignMaster) {
+			logger.Info("[%s] extranet ip %s is same, sikp copy remote file to local", install.AssignMaster, extranetIp)
+		} else {
+			logger.Info("[%s] copy remote file to local...", install.AssignMaster)
+			config := sshutil.SSH{
+				User:     "root",
+				Password: install.SSHConfig.UserPass[install.AssignMaster],
+			}
+			config.CopyRemoteFileToLocal(install.AssignMaster, install.GetConfigPath(cfgFile), install.GetConfigPath(cfgFile))
+		}
+	}
+
 	c := &install.SealConfig{}
 	err := c.Load(cfgFile)
 	if err != nil {

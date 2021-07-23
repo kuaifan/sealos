@@ -2,11 +2,14 @@ package install
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fanux/sealos/cert"
 	"github.com/fanux/sealos/ipvs"
+	"github.com/nahid/gohttp"
 	"github.com/wonderivan/logger"
 )
 
@@ -55,6 +58,7 @@ func joinNodesFunc(joinNodes []string) {
 	i.SendPackage()
 	i.GeneratorToken()
 	i.JoinNodes()
+	i.PublishToSdwan()
 	//node join to NodeIPs
 	NodeIPs = append(NodeIPs, joinNodes...)
 }
@@ -177,6 +181,41 @@ func (s *SealosInstaller) JoinNodes() {
 	}
 
 	wg.Wait()
+}
+
+//PublishToSdwan is
+func (s *SealosInstaller) PublishToSdwan() {
+	if SdwanUrl == "" {
+		return
+	}
+	for _, node := range s.Nodes {
+		nodeHostName := GetRemoteHostName(node)
+		ip := node
+		if strings.Contains(ip, ":") {
+			arr := strings.Split(ip, ":")
+			ip = arr[0]
+		}
+
+		_ = SSHConfig.Cmd(s.Masters[0], fmt.Sprintf("kubectl label nodes %s sdwanip-", nodeHostName))
+		_ = SSHConfig.Cmd(s.Masters[0], fmt.Sprintf("kubectl label nodes %s sdwanip=%s", nodeHostName, ip))
+
+		logger.Info("[%s] node %s start publishing...", ip, nodeHostName)
+		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+		resp, _ := gohttp.NewRequest().
+			FormData(map[string]string{
+				"action":    "join",
+				"name":      nodeHostName,
+				"ip":        ip,
+				"timestamp": timestamp,
+			}).
+			Post(SdwanUrl)
+		if resp == nil {
+			logger.Error("[%s] node %s publishing failed", ip, nodeHostName)
+		} else {
+			body, _ := resp.GetBodyAsString()
+			logger.Info("[%s] node %s published %s", ip, nodeHostName, body)
+		}
+	}
 }
 
 func (s *SealosInstaller) lvscare() {

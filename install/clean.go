@@ -2,9 +2,12 @@ package install
 
 import (
 	"fmt"
+	"github.com/nahid/gohttp"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fanux/sealos/ipvs"
 	sshcmd "github.com/fanux/sealos/pkg/sshcmd/cmd"
@@ -122,7 +125,33 @@ func (s *SealosClean) cleanNode(node string) {
 			hostname := isHostName(MasterIPs[0], node)
 			cmd := "kubectl delete node %s"
 			_ = SSHConfig.CmdAsync(MasterIPs[0], fmt.Sprintf(cmd, strings.TrimSpace(hostname)))
+			PublishToSdwan(node, strings.TrimSpace(hostname))
 		}
+	}
+}
+
+//PublishToSdwan is
+func PublishToSdwan(node string, nodeHostName string) {
+	ip := node
+	if strings.Contains(ip, ":") {
+		arr := strings.Split(ip, ":")
+		ip = arr[0]
+	}
+	logger.Info("[%s] delete node %s start publishing...", ip, nodeHostName)
+	timestamp := strconv.FormatInt(time.Now().Unix(), 10)
+	resp, _ := gohttp.NewRequest().
+		FormData(map[string]string{
+			"action":    "delete",
+			"name":      nodeHostName,
+			"ip":        ip,
+			"timestamp": timestamp,
+		}).
+		Post(SdwanUrl)
+	if resp == nil {
+		logger.Error("[%s] delete node %s publishing failed", ip, nodeHostName)
+	} else {
+		body, _ := resp.GetBodyAsString()
+		logger.Info("[%s] delete node %s published %s", ip, nodeHostName, body)
 	}
 }
 

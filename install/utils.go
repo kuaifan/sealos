@@ -3,6 +3,7 @@ package install
 import (
 	"archive/tar"
 	"archive/zip"
+	"bytes"
 	"compress/gzip"
 	"crypto/tls"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -207,7 +209,50 @@ func NextIP(ip net.IP) net.IP {
 
 // ParseIPs 解析ip 192.168.0.2-192.168.0.6
 func ParseIPs(ips []string) []string {
-	return DecodeIPs(ips)
+	return DecodeIPs(ParsePasss(ips))
+}
+
+// RunShellInSystem 在当前系统运行shell命令
+func RunShellInSystem(string string) (string, string, error) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := exec.Command("/bin/sh", "-c", string)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.String(), stderr.String(), err
+}
+
+// RemoveIpPort 去除IP中的端口
+func RemoveIpPort(ip string) string {
+	if strings.Contains(ip, ":") {
+		ip = strings.Split(ip, ":")[0]
+	}
+	return ip
+}
+
+// ParsePasss 将ip中的密码保存到全局变量
+func ParsePasss(ips []string) []string {
+	if SSHConfig.UserPass == nil {
+		SSHConfig.UserPass = map[string]string{}
+	}
+	var hosts []string
+	for _, host := range ips {
+		if strings.Contains(host, "@") {
+			arr := strings.Split(host, "@")
+			ip := arr[0]
+			pass := host[len(ip)+1:]
+			if strings.Contains(ip, ":") {
+				SSHConfig.UserPass[ip] = pass
+			} else {
+				SSHConfig.UserPass[ip+":22"] = pass
+			}
+			hosts = append(hosts, ip)
+		} else {
+			hosts = append(hosts, host)
+		}
+	}
+	return hosts
 }
 
 func DecodeIPs(ips []string) []string {
